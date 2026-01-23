@@ -6,10 +6,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_qdrant import QdrantVectorStore
+from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from qdrant_utils import create_collection_if_not_exists, qdrant
+from database import get_db_instance
 from config import app_config, api_config
 import requests
 import json
@@ -76,22 +77,33 @@ class RAGHandlerGemini:
     
     def _setup_vector_store(self, documents):
         """Setup Qdrant vector store with documents."""
+        db = get_db_instance()
         # Clear existing collection
         try:
-            qdrant.delete_collection(collection_name=self.collection_name)
+            db.del_collection(collection_name=self.collection_name)
         except:
             pass
         
         # Create new collection
-        create_collection_if_not_exists(collection_name=self.collection_name)
+        db.create_collection_if_not_exists(collection_name=self.collection_name)
         
         # Create and populate vector store
-        vectorstore = QdrantVectorStore(
-            client=qdrant,
-            embedding=self.embeddings,
-            collection_name=self.collection_name
-        )
-        vectorstore.add_documents(documents=documents)
+        if db.type == "qdrant":
+            vectorstore = QdrantVectorStore(
+                client=db.client,
+                embedding=self.embeddings,
+                collection_name=self.collection_name
+            )
+            # Add documents to Qdrant
+            vectorstore.add_documents(documents=documents)
+            
+        elif db.type == "chroma":
+            vectorstore = Chroma.from_documents(
+                documents=documents,
+                embedding=self.embeddings,
+                collection_name=self.collection_name,
+                persist_directory=db.persist_dir
+            )
         
         self.retriever = vectorstore.as_retriever()
     
@@ -100,10 +112,11 @@ class RAGHandlerGemini:
         system_prompt = (
             "You are a helpful cooking assistant. "
             "Use the provided recipe context to answer the user's culinary questions. "
+            "You must strictly follow the output format below for every recipe."
+            "\n\n"
             "If the user asks 'what can I cook with [ingredients]?', check the recipes strictly. "
-            "Provide a detailed and helpful answer, including: Recipe name and description, Ingredients list, Step-by-step instructions"
-            "If the answer is not in the cookbook, politely say you don't have that recipe "
-            "but offer general cooking advice if applicable. "
+            "Provide a detailed and helpful answer, including: Recipe name and description, COMPLETE Ingredients list, Step-by-step instructions"
+            "If the answer is not in the cookbook, politely say you don't have that recipe and offer general cooking advice if applicable. "
             "Format your answer with clear headings for Ingredients and Instructions."
             "\n\n"
             "{context}"
@@ -207,22 +220,33 @@ class RAGHandlerOllama:
     
     def _setup_vector_store(self, documents):
         """Setup Qdrant vector store with documents."""
+        db = get_db_instance()
         # Clear existing collection
         try:
-            qdrant.delete_collection(collection_name=self.collection_name)
+            db.del_collection(collection_name=self.collection_name)
         except:
             pass
         
         # Create new collection
-        create_collection_if_not_exists(collection_name=self.collection_name)
+        db.create_collection_if_not_exists(collection_name=self.collection_name)
         
         # Create and populate vector store
-        vectorstore = QdrantVectorStore(
-            client=qdrant,
-            embedding=self.embeddings,
-            collection_name=self.collection_name
-        )
-        vectorstore.add_documents(documents=documents)
+        if db.type == "qdrant":
+            vectorstore = QdrantVectorStore(
+                client=db.client,
+                embedding=self.embeddings,
+                collection_name=self.collection_name
+            )
+            # Add documents to Qdrant
+            vectorstore.add_documents(documents=documents)
+            
+        elif db.type == "chroma":
+            vectorstore = Chroma.from_documents(
+                documents=documents,
+                embedding=self.embeddings,
+                collection_name=self.collection_name,
+                persist_directory=db.persist_dir
+            )
         
         self.retriever = vectorstore.as_retriever()
     
@@ -231,10 +255,11 @@ class RAGHandlerOllama:
         system_prompt = (
             "You are a helpful cooking assistant. "
             "Use the provided recipe context to answer the user's culinary questions. "
+            "You must strictly follow the output format below for every recipe."
+            "\n\n"
             "If the user asks 'what can I cook with [ingredients]?', check the recipes strictly. "
-            "Provide a detailed and helpful answer, including: Recipe name and description, Ingredients list, Step-by-step instructions"
-            "If the answer is not in the cookbook, politely say you don't have that recipe "
-            "but offer general cooking advice if applicable. "
+            "Provide a detailed and helpful answer, including: Recipe name and description, COMPLETE Ingredients list, Step-by-step instructions"
+            "If the answer is not in the cookbook, politely say you don't have that recipe and offer general cooking advice if applicable. "
             "Format your answer with clear headings for Ingredients and Instructions."
             "\n\n"
             "{context}"
@@ -334,22 +359,33 @@ class RAGHandlerOllamaReq:
     
     def _setup_vector_store(self, documents):
         """Setup Qdrant vector store with documents."""
+        db = get_db_instance()
         # Clear existing collection
         try:
-            qdrant.delete_collection(collection_name=self.collection_name)
+            db.del_collection(collection_name=self.collection_name)
         except:
             pass
         
         # Create new collection
-        create_collection_if_not_exists(collection_name=self.collection_name)
+        db.create_collection_if_not_exists(collection_name=self.collection_name)
         
         # Create and populate vector store
-        vectorstore = QdrantVectorStore(
-            client=qdrant,
-            embedding=self.embeddings,
-            collection_name=self.collection_name
-        )
-        vectorstore.add_documents(documents=documents)
+        if db.type == "qdrant":
+            vectorstore = QdrantVectorStore(
+                client=db.client,
+                embedding=self.embeddings,
+                collection_name=self.collection_name
+            )
+            # Add documents to Qdrant
+            vectorstore.add_documents(documents=documents)
+            
+        elif db.type == "chroma":
+            vectorstore = Chroma.from_documents(
+                documents=documents,
+                embedding=self.embeddings,
+                collection_name=self.collection_name,
+                persist_directory=db.persist_dir
+            )
         
         self.retriever = vectorstore.as_retriever()
 
@@ -371,10 +407,11 @@ class RAGHandlerOllamaReq:
         system_prompt = (
             "You are a helpful cooking assistant. "
             "Use the provided recipe context to answer the user's culinary questions. "
+            "You must strictly follow the output format below for every recipe."
+            "\n\n"
             "If the user asks 'what can I cook with [ingredients]?', check the recipes strictly. "
-            "Provide a detailed and helpful answer, including: Recipe name and description, Ingredients list, Step-by-step instructions"
-            "If the answer is not in the cookbook, politely say you don't have that recipe "
-            "but offer general cooking advice if applicable. "
+            "Provide a detailed and helpful answer, including: Recipe name and description, COMPLETE Ingredients list, Step-by-step instructions"
+            "If the answer is not in the cookbook, politely say you don't have that recipe and offer general cooking advice if applicable. "
             "Format your answer with clear headings for Ingredients and Instructions."
         )
 
