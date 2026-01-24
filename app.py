@@ -1,12 +1,12 @@
 import streamlit as st
-from rag_handler import RAGHandlerOllamaReq
+from rag_handler import RAGHandlerOllamaReqDocling
 
 # Page Config
 st.set_page_config(page_title="Chef Bot RAG", layout="wide")
 
 # Initialize Session State
 if "rag" not in st.session_state:
-    st.session_state.rag = RAGHandlerOllamaReq()
+    st.session_state.rag = RAGHandlerOllamaReqDocling()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -17,9 +17,11 @@ with st.sidebar:
     
     if uploaded_file and st.button("Process Cookbook"):
         with st.spinner("Chef is reading the cookbook..."):
-            success = st.session_state.rag.process_pdf(uploaded_file)
-            if success:
+            status = st.session_state.rag.process_pdf(uploaded_file)
+            if status == "success":
                 st.success("Cookbook learned! You can now ask questions.")
+            elif status == "exists":
+                st.info(f"'{uploaded_file.name}' is already in the cookbook. Ready to ask!")
             else:
                 st.error("Failed to process the cookbook.")
 

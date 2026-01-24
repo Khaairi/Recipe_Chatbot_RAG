@@ -1,4 +1,5 @@
 from qdrant_client import QdrantClient
+from qdrant_client.http import models
 from qdrant_client.models import VectorParams, Distance
 from dotenv import load_dotenv
 from config import api_config
@@ -42,6 +43,12 @@ class QdrantDB():
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
             )
+
+            self.client.create_payload_index(
+                collection_name=collection_name,
+                field_name="metadata.source",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
             print(f"Collection '{collection_name}' created")
         else:
             print(f"Collection '{collection_name}' already exists")
@@ -52,6 +59,26 @@ class QdrantDB():
             print("Succesfully delete collection")
         except Exception as e:
             print("⚠️  Failed to delete collection")
+
+    def document_exists(self, collection_name: str, doc_source: str) -> bool:
+        """Check if vectors with specific source metadata exist."""
+        try:
+            scroll_result, _ = self.client.scroll(
+                collection_name=collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="metadata.source",
+                            match=models.MatchValue(value=doc_source)
+                        )
+                    ]
+                ),
+                limit=1
+            )
+            return len(scroll_result) > 0
+        except Exception as e:
+            print(f"⚠️ Check failed: {e}")
+            return False
 
 class LocalChromaDB:
     """Handler for Local ChromaDB (Fallback)"""
@@ -71,6 +98,14 @@ class LocalChromaDB:
             print("🗑️  Local Chroma collection deleted")
         except Exception as e:
             print(f"Collection clean: {e}")
+
+    def document_exists(self, collection_name: str, doc_source: str) -> bool:
+        try:
+            collection = self.client.get_collection(name=collection_name)
+            existing = collection.get(where={"source": doc_source}, limit=1)
+            return len(existing['ids']) > 0
+        except Exception:
+            return False
     
 
 def get_db_instance():
