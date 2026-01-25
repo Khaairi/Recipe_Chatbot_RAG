@@ -1,12 +1,15 @@
 import streamlit as st
-from rag_handler import RAGHandlerOllamaReqDocling
+from rag_handler import RAGHandlerGemini
+from vision_handler import IngredientDetector
 
 # Page Config
 st.set_page_config(page_title="Chef Bot RAG", layout="wide")
 
 # Initialize Session State
 if "rag" not in st.session_state:
-    st.session_state.rag = RAGHandlerOllamaReqDocling()
+    st.session_state.rag = RAGHandlerGemini()
+if "vision" not in st.session_state:
+    st.session_state.vision = IngredientDetector()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -31,6 +34,9 @@ st.title("👨‍🍳 Chef Bot (Recipe RAG)")
 # Display Chat History
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
+        if message.get("images"):
+            st.image(message["images"], width=200)
+
         st.markdown(message["content"])
 
         if "sources" in message:
@@ -40,15 +46,51 @@ for message in st.session_state.messages:
                     st.text(source['content'])
 
 # User Input
-if prompt := st.chat_input("Ask about a recipe..."):
+prompt_data = st.chat_input(
+    "Ask about a recipe...",
+    accept_file="multiple",
+    file_type=["png", "jpg", "jpeg"]
+)
+
+if prompt_data:
+    user_text = prompt_data.text
+    user_files = prompt_data.files
+
+    msg_content = user_text
+
+    detected_ingredients = ""
+
+    if user_files:
+        with st.spinner("Chef is analyzing your ingredients..."):
+
+            detected_items = st.session_state.vision.detect_ingredients(user_files)
+
+            if detected_items:
+                items_str = ", ".join(detected_items)
+                detected_ingredients = items_str
+
+                if user_text:
+                    msg_content = f"(I have these ingredients: {items_str})\n\n{user_text}"
+                else:
+                    msg_content = f"I have these ingredients: {items_str}. What should i cook?"
+            else:
+                st.warning("Cant recognize image.")
+
     # Display user message
-    st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        if user_files:
+            st.image(user_files, width=200)
+        st.markdown(msg_content)
+    st.session_state.messages.append({
+        "role": "user", 
+        "content": msg_content,
+        "images": user_files if user_files else None
+    })
 
     # Generate Response
     try:
         with st.spinner("Chef is thinking..."):
-            answer, sources = st.session_state.rag.query(prompt)
+            answer, sources = st.session_state.rag.query(msg_content)
 
             clean_sources = []
             for doc in sources:
