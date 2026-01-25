@@ -3,6 +3,8 @@ from PIL import Image
 import json
 import io
 from config import api_config, app_config
+import base64
+import requests
 
 class IngredientDetector:
     def __init__(self):
@@ -45,4 +47,71 @@ class IngredientDetector:
             
         except Exception as e:
             print(f"Error identifying ingredients: {e}")
+            return []
+        
+class IngredientDetectorLlava:
+    def __init__(self):
+        self.model = app_config.vision_model
+        self.api_url = api_config.ollama_url
+
+    def _image_to_base64(self, image_file):
+        """Convert an uploaded file (or bytes) to base64 string for Ollama."""
+        image_file.seek(0)
+        return base64.b64encode(image_file.read()).decode('utf-8')
+    
+    def detect_ingredients(self, image_files):
+        """
+        Analyzes a list of images LOCALLY using Ollama (Llava/Moondream).
+        """
+        all_ingredients = set()
+
+        try:
+            for img_file in image_files:
+                b64_image = self._image_to_base64(img_file)
+                
+                prompt = (
+                    "Look at this cooking ingredient image. "
+                    "List ONLY the food ingredients you see. "
+                    "Format the output as a simple comma-separated list. "
+                    "Do not write complete sentences. "
+                    "output ONLY ONE ingredient"
+                    "Example: eggs"
+                )
+
+                payload = {
+                    "model": self.model,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt,
+                            "images": [b64_image]
+                        }
+                    ],
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1
+                    }
+                }
+
+                response = requests.post(self.api_url, json=payload, timeout=120)
+                response.raise_for_status()
+                
+                result_json = response.json()
+                content = result_json["message"]["content"]
+                
+                print(f"content: {content}")
+                items = [item.strip().lower() for item in content.replace('\n', ',').split(',')]
+                
+                for item in items:
+                    if item and len(item) > 2: # Filter out empty strings or noise
+                        if "image" not in item and "contain" not in item:
+                            all_ingredients.add(item.title())
+
+            return list(all_ingredients)
+
+        except requests.exceptions.ConnectionError:
+            print("❌ Error: Could not connect to Ollama. Make sure 'ollama serve' is running.")
+            return []
+        except Exception as e:
+            print(f"❌ Vision Error: {e}")
             return []

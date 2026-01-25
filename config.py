@@ -29,6 +29,7 @@ class AppConfig:
     llm_model: str = "gemini-2.5-flash"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     ollama_model: str = "llama3.1"
+    vision_model: str = "llava"
     chunk_size: int = 1500
     chunk_overlap: int = 200
     collection_name: str = "recipe_book"

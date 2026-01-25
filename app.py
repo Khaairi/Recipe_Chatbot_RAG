@@ -1,6 +1,6 @@
 import streamlit as st
 from rag_handler import RAGHandlerGemini
-from vision_handler import IngredientDetector
+from vision_handler import IngredientDetectorLlava
 
 # Page Config
 st.set_page_config(page_title="Chef Bot RAG", layout="wide")
@@ -9,7 +9,7 @@ st.set_page_config(page_title="Chef Bot RAG", layout="wide")
 if "rag" not in st.session_state:
     st.session_state.rag = RAGHandlerGemini()
 if "vision" not in st.session_state:
-    st.session_state.vision = IngredientDetector()
+    st.session_state.vision = IngredientDetectorLlava()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
